@@ -116,6 +116,7 @@ enum QuotaKind: String, Codable, Hashable, Sendable {
     case credits
     case chat
     case completions
+    case geminiModels
     case claudePool
     case claudePoolWeekly
 
@@ -134,6 +135,7 @@ enum QuotaKind: String, Codable, Hashable, Sendable {
         case .credits: "Credits"
         case .chat: "Chat"
         case .completions: "Completions"
+        case .geminiModels: "Gemini"
         case .claudePool: "Claude"
         case .claudePoolWeekly: "Claude Weekly"
         }
@@ -154,6 +156,7 @@ enum QuotaKind: String, Codable, Hashable, Sendable {
         case .credits: .credits
         case .chat: .chat
         case .completions: .completions
+        case .geminiModels: .geminiModels
         case .claudePool: .claudePool
         case .claudePoolWeekly: .claudePoolWeekly
         }
@@ -173,6 +176,7 @@ enum MenuBarMetricID: String, CaseIterable, Codable, Identifiable, Sendable {
     case apiUsage
     case chat
     case completions
+    case geminiModels
     case claudePool
     case claudePoolWeekly
     case extraUsage
@@ -194,6 +198,7 @@ enum MenuBarMetricID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .apiUsage: "API Usage"
         case .chat: "Chat"
         case .completions: "Completions"
+        case .geminiModels: "Gemini"
         case .claudePool: "Claude"
         case .claudePoolWeekly: "Claude Weekly"
         case .extraUsage: "Extra Usage"
@@ -215,6 +220,7 @@ enum MenuBarMetricID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .apiUsage: "terminal"
         case .chat: "bubble.left.and.bubble.right"
         case .completions: "text.badge.checkmark"
+        case .geminiModels: "sparkles"
         case .claudePool: "brain"
         case .claudePoolWeekly: "calendar.badge.clock"
         case .extraUsage: "dollarsign.circle"
@@ -236,6 +242,7 @@ enum MenuBarMetricID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .apiUsage: "API"
         case .chat: "Ch"
         case .completions: "Co"
+        case .geminiModels: "Gm"
         case .claudePool: "Cl"
         case .claudePoolWeekly: "ClW"
         case .extraUsage: "E"
@@ -257,6 +264,7 @@ enum MenuBarMetricID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .apiUsage: .apiUsage
         case .chat: .chat
         case .completions: .completions
+        case .geminiModels: .geminiModels
         case .claudePool: .claudePool
         case .claudePoolWeekly: .claudePoolWeekly
         case .credits: .credits

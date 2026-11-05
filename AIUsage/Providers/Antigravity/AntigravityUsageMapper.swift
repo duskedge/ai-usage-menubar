@@ -32,6 +32,7 @@ enum AntigravityUsageMapper {
                     let remaining = ProviderParsing.double(
                         bucket["remainingFraction"]
                     ),
+                    remaining.isFinite, (0...1).contains(remaining),
                     !windows.contains(where: { $0.kind == kind })
                 else {
                     continue
@@ -43,6 +44,7 @@ enum AntigravityUsageMapper {
                 ))
             }
         }
+        guard !windows.isEmpty else { return nil }
         return ProviderSnapshot(
             provider: .antigravity,
             planName: planName,
@@ -51,49 +53,51 @@ enum AntigravityUsageMapper {
         )
     }
 
-    static func legacy(
-        _ data: Data,
+    // Model quotas do not identify a five-hour or weekly window. Keep them
+    // separate from authoritative summary buckets and never replace those.
+    static func supplementGemini(
+        _ snapshot: ProviderSnapshot?,
+        modelsData: Data,
         planName: String?,
         now: Date
     ) -> ProviderSnapshot? {
-        guard let root = try? ProviderParsing.object(from: data),
+        if let snapshot, snapshot.windows.contains(where: {
+            $0.kind == .session || $0.kind == .weekly
+        }) {
+            return snapshot
+        }
+        guard let root = try? ProviderParsing.object(from: modelsData),
               let models = root["models"] as? [String: Any]
         else {
-            return nil
+            return snapshot
         }
-        var worstRemaining: [QuotaKind: (Double, Date?)] = [:]
+        var candidates: [(remaining: Double, reset: Date)] = []
         for (identifier, rawModel) in models {
             guard let model = ProviderParsing.object(rawModel),
                   model["isInternal"] as? Bool != true,
-                  let label = ProviderParsing.string(model["displayName"])
-                    ?? ProviderParsing.string(model["label"]),
-                  let quota = ProviderParsing.object(model["quotaInfo"])
+                  identifier.lowercased().hasPrefix("gemini-"),
+                  let quota = ProviderParsing.object(model["quotaInfo"]),
+                  let remaining = ProviderParsing.double(quota["remainingFraction"]),
+                  remaining.isFinite, (0...1).contains(remaining),
+                  let reset = ProviderParsing.date(quota["resetTime"]),
+                  reset > now
             else {
                 continue
             }
-            let kind: QuotaKind = label.lowercased().contains("gemini")
-                ? .session
-                : .claudePool
-            let remaining = ProviderParsing.double(
-                quota["remainingFraction"]
-            ) ?? 0
-            let candidate = (
-                remaining,
-                ProviderParsing.date(quota["resetTime"])
-            )
-            if candidate.0 < (worstRemaining[kind]?.0 ?? 2) {
-                worstRemaining[kind] = candidate
-            }
-            _ = identifier
+            candidates.append((remaining, reset))
         }
-        let windows = worstRemaining.map { kind, value in
-            QuotaWindow(
-                kind: kind,
-                usedPercent: clamp((1 - value.0) * 100).rounded(),
-                resetsAt: value.1
-            )
+        // Some accounts receive fabricated all-full model quotas. Without
+        // evidence of consumption, do not present that response as zero usage.
+        guard let worst = candidates.min(by: { $0.remaining < $1.remaining }),
+              worst.remaining < 1 else {
+            return snapshot
         }
-        guard !windows.isEmpty else { return nil }
+        var windows = snapshot?.windows ?? []
+        windows.append(QuotaWindow(
+            kind: .geminiModels,
+            usedPercent: clamp((1 - worst.remaining) * 100).rounded(),
+            resetsAt: worst.reset
+        ))
         return ProviderSnapshot(
             provider: .antigravity,
             planName: planName,
@@ -124,7 +128,7 @@ enum AntigravityUsageMapper {
         _ windows: [QuotaWindow]
     ) -> [QuotaWindow] {
         let order: [QuotaKind] = [
-            .session, .weekly, .claudePool, .claudePoolWeekly
+            .session, .weekly, .geminiModels, .claudePool, .claudePoolWeekly
         ]
         return windows.sorted {
             (order.firstIndex(of: $0.kind) ?? 99)
