@@ -1,0 +1,106 @@
+name: Build macOS app
+
+on:
+  push:
+    branches:
+      - main
+      - 'fix/**'
+    paths:
+      - 'AIUsage/**'
+      - 'AIUsageTests/**'
+      - 'AIUsage.xcodeproj/**'
+      - '.github/workflows/build-macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project AIUsage.xcodeproj \
+            -scheme AIUsage \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath DerivedData-CI \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            ENABLE_HARDENED_RUNTIME=NO \
+            | tee tests.log
+
+      - name: Build Release app
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project AIUsage.xcodeproj \
+            -scheme AIUsage \
+            -configuration Release \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath DerivedData-CI \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            ENABLE_HARDENED_RUNTIME=NO \
+            | tee build.log
+
+      - name: Package app
+        run: |
+          set -euo pipefail
+          app='DerivedData-CI/Build/Products/Release/AI Usage.app'
+          test -d "$app"
+          codesign --verify --deep --strict "$app"
+          mkdir -p dist/package/Licenses
+          ditto "$app" 'dist/package/AI Usage.app'
+          cp LICENSE dist/package/Licenses/AI-Usage.txt
+          cp NOTICE dist/package/Licenses/Third-Party-Notices.txt
+          cp DerivedData-CI/SourcePackages/checkouts/Sparkle/LICENSE dist/package/Licenses/Sparkle.txt
+          printf '%s\n' "$GITHUB_SHA" > dist/package/COMMIT.txt
+          ditto -c -k --sequesterRsrc dist/package dist/AI-Usage-macos-arm64.zip
+          (cd dist && shasum -a 256 AI-Usage-macos-arm64.zip > AI-Usage-macos-arm64.zip.sha256)
+          {
+            echo '### AI Usage build'
+            echo 'Download the **AI-Usage-macos-arm64** artifact, extract both ZIP layers, and move AI Usage.app into /Applications after quitting the old app.'
+            echo ''
+            echo 'This Apple Silicon build is ad-hoc signed, without Apple notarization. It retains the upstream update feed; installing an upstream update replaces the fork.'
+            echo "Source commit: $GITHUB_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload installable app
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: AI-Usage-macos-arm64
+          path: |
+            dist/AI-Usage-macos-arm64.zip
+            dist/AI-Usage-macos-arm64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-build-diagnostics
+          path: |
+            tests.log
+            build.log
+            TestResults.xcresult
+          retention-days: 7
