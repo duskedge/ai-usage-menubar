@@ -21,6 +21,7 @@ struct ProviderSectionView: View {
                 if !snapshot.windows.isEmpty {
                     QuotaGrid(
                         windows: snapshot.windows,
+                        provider: state.provider,
                         displayMode: displayMode
                     )
                     .padding(.horizontal, 10)
@@ -211,6 +212,7 @@ private struct BillingUsageRow: View {
 
 private struct QuotaGrid: View {
     let windows: [QuotaWindow]
+    let provider: ProviderID
     let displayMode: UsageDisplayMode
 
     var body: some View {
@@ -218,7 +220,7 @@ private struct QuotaGrid: View {
             ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
                 HStack(spacing: 0) {
                     ForEach(Array(row.enumerated()), id: \.element.id) { columnIndex, window in
-                        QuotaTile(window: window, displayMode: displayMode)
+                        QuotaTile(window: window, provider: provider, displayMode: displayMode)
 
                         if columnIndex == 0, row.count == 2 {
                             Color(nsColor: .separatorColor)
@@ -247,13 +249,14 @@ private struct QuotaGrid: View {
 
 private struct QuotaTile: View {
     let window: QuotaWindow
+    let provider: ProviderID
     let displayMode: UsageDisplayMode
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(window.kind.title)
+                    Text(title)
                         .font(.caption.weight(.medium))
                         .lineLimit(1)
                     Spacer(minLength: 4)
@@ -302,9 +305,17 @@ private struct QuotaTile: View {
             .padding(.vertical, 5)
             .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(window.kind.title)
+            .accessibilityLabel(title)
             .accessibilityValue(accessibilityValue(relativeTo: context.date))
         }
+    }
+
+    private var title: String {
+        if provider == .antigravity {
+            if window.kind == .session { return "Gemini 5h" }
+            if window.kind == .weekly { return "Gemini Weekly" }
+        }
+        return window.kind.title
     }
 
     private var percentText: String {

@@ -83,7 +83,8 @@ final class AntigravityTests: XCTestCase {
                 dateProvider: FixedDateProvider(value: now)
             ),
             client: AntigravityUsageClient(http: http),
-            dateProvider: FixedDateProvider(value: now)
+            dateProvider: FixedDateProvider(value: now),
+            localQuota: NoLocalAntigravityQuota()
         )
     }
 }
@@ -91,5 +92,56 @@ final class AntigravityTests: XCTestCase {
 private struct AntigravityTestRunner: ProcessRunning {
     func run(executable: String, arguments: [String], environment: [String: String], timeout: TimeInterval) throws -> ProcessResult {
         ProcessResult(exitCode: 0, stdout: #"{"access_token":"test-access"}"#, stderr: "")
+    }
+}
+
+struct NoLocalAntigravityQuota: AntigravityLocalQuotaProviding {
+    func snapshot(now: Date) async -> ProviderSnapshot? { nil }
+}
+
+final class AntigravityLocalQuotaTests: XCTestCase {
+    func testDesktopSummaryIncludesFiveHourAndArgonBuckets() async throws {
+        let http = MockHTTPClient([httpResponse(json: #"{"response":{"groups":[{"buckets":[{"bucketId":"gemini-5h","remainingFraction":0.98},{"bucketId":"gemini-weekly","remainingFraction":1},{"bucketId":"gemini-argon-wtu-weekly","remainingFraction":0.62,"resetTime":1800600000}]}]}}"#)])
+        let client = AntigravityLocalQuotaClient(discovery: LocalTestEndpoints(), http: http)
+        let provider = AntigravityProvider(localQuota: client)
+        let snapshot = try await provider.fetch()
+        XCTAssertEqual(snapshot.windows.map(\.kind), [.session, .weekly, .argonWeekly])
+        XCTAssertEqual(snapshot.windows.map(\.usedPercent), [2, 0, 38])
+        XCTAssertEqual(snapshot.window(for: .argonWeekly)?.resetsAt, Date(timeIntervalSince1970: 1800600000))
+        let requests = await http.capturedRequests()
+        XCTAssertEqual(requests.first?.url.host, "127.0.0.1")
+        XCTAssertEqual(requests.first?.headers["X-Codeium-Csrf-Token"], "test-csrf")
+    }
+
+    func testLocalFailureDoesNotInventQuota() async {
+        for response in [httpResponse(401), httpResponse(json: "invalid"), httpResponse(json: "{}") ] {
+            let client = AntigravityLocalQuotaClient(discovery: LocalTestEndpoints(), http: MockHTTPClient([response]))
+            let snapshot = await client.snapshot(now: Date())
+            XCTAssertNil(snapshot)
+        }
+    }
+
+    func testDiscoverySkipsInvalidFilesAndPrefersNewestLiveDaemon() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        for (index, port) in [12345, 23456].enumerated() {
+            let url = directory.appendingPathComponent("hub_\(port).json")
+            let data = try JSONSerialization.data(withJSONObject: [
+                "pid": ProcessInfo.processInfo.processIdentifier,
+                "httpsPort": port, "csrfToken": "fixture"
+            ])
+            try data.write(to: url)
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: Double(index + 1))], ofItemAtPath: url.path)
+        }
+        try Data(#"{"pid":0,"httpsPort":65536,"csrfToken":"fixture"}"#.utf8)
+            .write(to: directory.appendingPathComponent("hub_bad.json"))
+        XCTAssertEqual(AntigravityDaemonDiscovery(directory: directory).endpoints().map(\.port), [23456, 12345])
+    }
+}
+
+private struct LocalTestEndpoints: AntigravityLocalEndpointDiscovering {
+    func endpoints() -> [AntigravityLocalEndpoint] {
+        [AntigravityLocalEndpoint(port: 12345, csrfToken: "test-csrf")]
     }
 }

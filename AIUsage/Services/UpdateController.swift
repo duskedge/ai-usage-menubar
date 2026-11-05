@@ -19,8 +19,16 @@ final class UpdateController: NSObject, SPUUpdaterDelegate {
         )
 
         if startingUpdater {
+            // Existing installations may have upstream auto-downloads disabled.
+            // Migrate once; later choices made in Sparkle remain user-controlled.
+            let key = "duskedgeAutomaticUpdatesConfigured.v1"
+            if !UserDefaults.standard.bool(forKey: key) {
+                updaterController.updater.automaticallyChecksForUpdates = true
+                updaterController.updater.automaticallyDownloadsUpdates = true
+                UserDefaults.standard.set(true, forKey: key)
+            }
             isChecking = true
-            updaterController.updater.checkForUpdateInformation()
+            updaterController.updater.checkForUpdatesInBackground()
         }
     }
 

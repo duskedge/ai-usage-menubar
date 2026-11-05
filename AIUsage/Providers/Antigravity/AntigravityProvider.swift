@@ -5,19 +5,25 @@ actor AntigravityProvider: UsageProvider {
 
     private let authStore: AntigravityAuthStore
     private let client: AntigravityUsageClient
+    private let localQuota: any AntigravityLocalQuotaProviding
     private let dateProvider: DateProviding
 
     init(
         authStore: AntigravityAuthStore = AntigravityAuthStore(),
         client: AntigravityUsageClient = AntigravityUsageClient(),
-        dateProvider: DateProviding = SystemDateProvider()
+        dateProvider: DateProviding = SystemDateProvider(),
+        localQuota: any AntigravityLocalQuotaProviding = AntigravityLocalQuotaClient()
     ) {
         self.authStore = authStore
         self.client = client
         self.dateProvider = dateProvider
+        self.localQuota = localQuota
     }
 
     func fetch() async throws -> ProviderSnapshot {
+        if let snapshot = await localQuota.snapshot(now: dateProvider.now()) {
+            return snapshot
+        }
         guard let auth = try authStore.load() else {
             throw ProviderFailure(
                 .authentication,
