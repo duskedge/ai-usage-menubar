@@ -88,6 +88,23 @@ the menu bar rather than the Dock. macOS 26 or newer is required.
 - Native light and dark appearances with Liquid Glass
 - Launch at Login enabled by default and still user-controllable
 
+## Fork builds with GitHub Actions
+
+The **Build macOS app** workflow runs on pushes to `main` and `fix/**` that
+change the app, tests, Xcode project, or workflow. It can also be started manually
+from the Actions tab once the workflow is on the default branch.
+
+A successful run tests the app and uploads the **AI-Usage-macos-arm64** artifact.
+Download it from that run, extract the artifact ZIP and the inner app ZIP, quit
+AI Usage, then move `AI Usage.app` into `/Applications`, replacing the old app.
+Build artifacts are retained for 14 days. The included `COMMIT.txt` records the
+source commit; the SHA-256 file verifies the inner ZIP.
+
+These Apple Silicon builds are ad-hoc signed and are not Apple-notarized. macOS
+may require approval in **System Settings → Privacy & Security** on first launch.
+They retain the upstream update feed, so installing an upstream app update will
+replace the fork build.
+
 ## Build from source
 
 You need:
