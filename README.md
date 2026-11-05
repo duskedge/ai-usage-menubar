@@ -88,22 +88,35 @@ the menu bar rather than the Dock. macOS 26 or newer is required.
 - Native light and dark appearances with Liquid Glass
 - Launch at Login enabled by default and still user-controllable
 
-## Fork builds with GitHub Actions
+## Fork builds, Releases, and automatic updates
 
-The **Build macOS app** workflow runs on pushes to `main` and `fix/**` that
-change the app, tests, Xcode project, or workflow. It can also be started manually
-from the Actions tab once the workflow is on the default branch.
+The **Build macOS app** workflow tests and builds pushes to `main` and `fix/**`.
+Download the **AI-Usage-macos-arm64** artifact from a successful run (retained for
+14 days). Extract both ZIP layers, quit AI Usage, and replace the installed app.
 
-A successful run tests the app and uploads the **AI-Usage-macos-arm64** artifact.
-Download it from that run, extract the artifact ZIP and the inner app ZIP, quit
-AI Usage, then move `AI Usage.app` into `/Applications`, replacing the old app.
-Build artifacts are retained for 14 days. The included `COMMIT.txt` records the
-source commit; the SHA-256 file verifies the inner ZIP.
+Version tags such as `v0.2.2-duskedge.1` additionally publish a GitHub Release
+with the app ZIP, SHA-256 checksum, and signed Sparkle appcast. The version before
+`-duskedge` must match `MARKETING_VERSION`. Build numbers increase with workflow
+runs. The repository Secret `SPARKLE_PRIVATE_KEY` signs updates; its matching
+public key is embedded in the app. The private key must never be committed.
+
+Install this fork build manually once to switch from the upstream signing key
+and feed. The app then checks this fork's latest Release at launch and hourly,
+automatically downloads signed updates, and uses Sparkle to install them when
+the application is ready to quit. A git push alone produces a test build; publish
+a version tag to distribute an automatic update. Only fork Releases are used,
+so official upstream releases cannot replace the custom functionality.
 
 These Apple Silicon builds are ad-hoc signed and are not Apple-notarized. macOS
 may require approval in **System Settings → Privacy & Security** on first launch.
-They retain the upstream update feed, so installing an upstream app update will
-replace the fork build.
+
+Antigravity quota is read first from the most recently started live local
+Antigravity daemon, using its local CSRF credential and loopback HTTPS. This
+includes Gemini five-hour and weekly buckets and the separate Argon weekly
+bucket. The desktop app or CLI must be running for this authoritative source.
+If it is unavailable, the existing cloud summary and observed Gemini model
+quota fallback remain available. A model-only response cannot identify weekly
+or five-hour buckets and is labeled simply **Gemini**.
 
 ## Build from source
 
@@ -136,7 +149,7 @@ quota data directly from each provider's first-party endpoint.
 - Tokens are never printed, logged, or sent anywhere else.
 - Temporary failures keep the last successful values in memory and mark them
   stale.
-- Nothing is cached across launches.
+- Usage readings are not cached across launches.
 
 API-key-only Codex authentication can't read ChatGPT subscription usage.
 `CLAUDE_CODE_OAUTH_TOKEN` is intentionally ignored because setup tokens don't

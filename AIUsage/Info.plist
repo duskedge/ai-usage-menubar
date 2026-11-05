@@ -27,17 +27,17 @@
 	<key>SUAllowsAutomaticUpdates</key>
 	<true/>
 	<key>SUAutomaticallyUpdate</key>
-	<false/>
+	<true/>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/burakgon/ai-usage-menubar/main/appcast.xml</string>
+	<string>https://github.com/duskedge/ai-usage-menubar/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>Axec4KdnVCK/H0z6UrhigcI44LRzdrN8vnBxIvqPurc=</string>
+	<string>hpw3vABcLPG3YymaYORPbhCc2lvguFrZaLiDqCrJffU=</string>
 	<key>SURequireSignedFeed</key>
 	<true/>
 	<key>SUScheduledCheckInterval</key>
-	<integer>86400</integer>
+	<integer>3600</integer>
 	<key>SUVerifyUpdateBeforeExtraction</key>
 	<true/>
 </dict>

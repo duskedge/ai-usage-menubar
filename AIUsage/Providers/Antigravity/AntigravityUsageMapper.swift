@@ -7,7 +7,8 @@ enum AntigravityUsageMapper {
         "gemini-5h": .session,
         "gemini-weekly": .weekly,
         "3p-5h": .claudePool,
-        "3p-weekly": .claudePoolWeekly
+        "3p-weekly": .claudePoolWeekly,
+        "gemini-argon-wtu-weekly": .argonWeekly
     ]
 
     static func summary(
@@ -128,7 +129,7 @@ enum AntigravityUsageMapper {
         _ windows: [QuotaWindow]
     ) -> [QuotaWindow] {
         let order: [QuotaKind] = [
-            .session, .weekly, .geminiModels, .claudePool, .claudePoolWeekly
+            .session, .weekly, .geminiModels, .argonWeekly, .claudePool, .claudePoolWeekly
         ]
         return windows.sorted {
             (order.firstIndex(of: $0.kind) ?? 99)

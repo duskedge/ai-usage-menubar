@@ -1,3 +1,21 @@
+# Fork release workflow
+
+For `duskedge/ai-usage-menubar`, use `.github/workflows/build-macos.yml` and
+`scripts/package_fork_update.sh`. Set `MARKETING_VERSION` to the new app version
+and publish a matching tag, for example `v0.2.2-duskedge.1`. GitHub Actions runs
+the complete test suite, builds the app, signs the update archive and appcast
+using the repository Secret `SPARKLE_PRIVATE_KEY`, and creates a Release.
+
+The private signing key is backed up in the maintainer's macOS Keychain under
+account `duskedge-ai-usage-menubar`. Keep it out of source control and logs.
+The first fork update must be installed manually to change the embedded public
+key and feed. Subsequent signed Releases update through Sparkle.
+
+The original upstream Developer ID/notarization instructions are retained below
+for reference. The fork CI uses ad-hoc signing and does not use that release script.
+
+---
+
 # Releasing AI Usage
 
 AI Usage ships as a universal DMG and uses Sparkle 2 for signed over-the-air

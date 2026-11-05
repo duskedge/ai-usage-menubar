@@ -7,15 +7,16 @@ final class UpdateConfigurationTests: XCTestCase {
 
         XCTAssertEqual(
             info?["SUFeedURL"] as? String,
-            "https://raw.githubusercontent.com/burakgon/ai-usage-menubar/main/appcast.xml"
+            "https://github.com/duskedge/ai-usage-menubar/releases/latest/download/appcast.xml"
         )
         XCTAssertEqual(
             info?["SUPublicEDKey"] as? String,
-            "Axec4KdnVCK/H0z6UrhigcI44LRzdrN8vnBxIvqPurc="
+            "hpw3vABcLPG3YymaYORPbhCc2lvguFrZaLiDqCrJffU="
         )
+        XCTAssertEqual(info?["SUAutomaticallyUpdate"] as? Bool, true)
         XCTAssertEqual(info?["SUEnableAutomaticChecks"] as? Bool, true)
         XCTAssertEqual(info?["SURequireSignedFeed"] as? Bool, true)
         XCTAssertEqual(info?["SUVerifyUpdateBeforeExtraction"] as? Bool, true)
-        XCTAssertEqual(info?["SUScheduledCheckInterval"] as? Int, 86_400)
+        XCTAssertEqual(info?["SUScheduledCheckInterval"] as? Int, 3_600)
     }
 }
