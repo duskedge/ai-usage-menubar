@@ -67,31 +67,37 @@ actor AntigravityProvider: UsageProvider {
         case .authentication, .unavailable: planData = nil
         }
         let plan = AntigravityUsageMapper.plan(planData)
-        if case let .success(data) = summary,
-           let snapshot = AntigravityUsageMapper.summary(
-               data,
-               planName: plan,
-               now: dateProvider.now()
-           ) {
+        let now = dateProvider.now()
+        var snapshot: ProviderSnapshot?
+        if case let .success(data) = summary {
+            snapshot = AntigravityUsageMapper.summary(
+                data, planName: plan, now: now
+            )
+        }
+        if let snapshot, snapshot.windows.contains(where: {
+            $0.kind == .session || $0.kind == .weekly
+        }) {
             return snapshot
         }
 
-        switch await client.cloudCode(
+        let models = await client.cloudCode(
             path: AntigravityUsageClient.modelsPath,
             accessToken: token,
             userAgent: "antigravity"
-        ) {
-        case let .success(data):
-            if let snapshot = AntigravityUsageMapper.legacy(
-                data,
-                planName: plan,
-                now: dateProvider.now()
-            ) {
-                return snapshot
-            }
+        )
+        if case let .success(data) = models,
+           let supplemented = AntigravityUsageMapper.supplementGemini(
+               snapshot, modelsData: data, planName: plan, now: now
+           ) {
+            return supplemented
+        }
+        // An optional Gemini request must not discard a valid Claude reading.
+        if let snapshot { return snapshot }
+        switch models {
+        case .success:
             throw ProviderFailure(
                 .invalidResponse,
-                "Antigravity quota response changed."
+                "Antigravity quota data is unavailable."
             )
         case .authentication:
             throw ProviderFailure(

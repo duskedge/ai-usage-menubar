@@ -68,6 +68,13 @@ the menu bar rather than the Dock. macOS 26 or newer is required.
 - Codex session, weekly, Spark, and Spark weekly limits
 - Cursor total, Auto, and API usage
 - Antigravity Gemini and Claude pool limits
+
+  When the quota summary omits Gemini, AI Usage supplements it with observed
+  model quota consumption and labels it **Gemini**, without inferring a
+  five-hour or weekly window. Summary buckets remain authoritative. Model
+  responses with no valid future reset or no observed consumption are omitted:
+  some accounts return synthetic all-full quotas. Model-only Gemini quota is
+  therefore unavailable until consumption is reported.
 - GitHub Copilot credits, chat, and completions
 - Devin daily and weekly quota
 - Grok weekly quota
