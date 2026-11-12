@@ -1,12 +1,13 @@
 import Foundation
 
 private struct CursorRefreshResponse: Decodable {
-    let accessToken: String
+    let accessToken: String?
     let shouldLogout: Bool?
+    let error: String?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
-        case shouldLogout
+        case shouldLogout, error
     }
 }
 
@@ -45,7 +46,7 @@ actor CursorProvider: UsageProvider {
         }
 
         var usage = try await requestUsage(token)
-        if usage.statusCode == 401 || usage.statusCode == 403 {
+        if usage.statusCode == 401 {
             try await refresh(&auth)
             guard let refreshed = auth.accessToken else {
                 throw ProviderFailure(
@@ -56,22 +57,13 @@ actor CursorProvider: UsageProvider {
             token = refreshed
             usage = try await requestUsage(token)
         }
-        if usage.statusCode == 401 || usage.statusCode == 403 {
+        if usage.statusCode == 401 {
             throw ProviderFailure(
                 .authentication,
                 "Cursor session expired. Sign in again."
             )
         }
-        if usage.statusCode == 429 {
-            throw ProviderFailure(
-                .rateLimited,
-                "Cursor is rate limited. Try again later.",
-                retryAt: ProviderParsing.retryDate(
-                    from: usage,
-                    now: dateProvider.now()
-                )
-            )
-        }
+        try checkServiceFailure(usage, operation: "usage request")
         let plan = try? await client.fetchPlan(accessToken: token)
         return try CursorUsageMapper.map(
             usageResponse: usage,
@@ -107,21 +99,29 @@ actor CursorProvider: UsageProvider {
                 "Cursor could not refresh its session."
             )
         }
-        guard (200..<300).contains(response.statusCode),
-              let decoded = try? JSONDecoder().decode(
-                CursorRefreshResponse.self,
-                from: response.body
-              ),
-              decoded.shouldLogout != true,
-              !decoded.accessToken.isEmpty else {
+        try checkServiceFailure(response, operation: "session refresh")
+        let decoded = try? JSONDecoder().decode(
+            CursorRefreshResponse.self, from: response.body
+        )
+        if response.statusCode == 401
+            || decoded?.error == "invalid_grant"
+            || decoded?.shouldLogout == true {
             throw ProviderFailure(
                 .authentication,
                 "Cursor session expired. Sign in again."
             )
         }
+        guard (200..<300).contains(response.statusCode),
+              let token = decoded?.accessToken,
+              !token.isEmpty else {
+            throw ProviderFailure(
+                .invalidResponse,
+                "Cursor session refresh failed (\(response.statusCode))."
+            )
+        }
         do {
             try authStore.saveAccessToken(
-                decoded.accessToken,
+                token,
                 source: auth.source
             )
         } catch {
@@ -130,6 +130,29 @@ actor CursorProvider: UsageProvider {
                 "Cursor session could not be saved."
             )
         }
-        auth.accessToken = decoded.accessToken
+        auth.accessToken = token
+    }
+
+    private func checkServiceFailure(
+        _ response: HTTPResponse,
+        operation: String
+    ) throws {
+        switch response.statusCode {
+        case 429:
+            throw ProviderFailure(
+                .rateLimited,
+                "Cursor is rate limited. Try again later.",
+                retryAt: ProviderParsing.retryDate(
+                    from: response, now: dateProvider.now()
+                )
+            )
+        case 403, 500..<600:
+            throw ProviderFailure(
+                .transient,
+                "Cursor \(operation) failed (\(response.statusCode))."
+            )
+        default:
+            break
+        }
     }
 }

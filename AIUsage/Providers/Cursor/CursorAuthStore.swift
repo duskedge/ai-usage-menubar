@@ -73,12 +73,12 @@ struct CursorAuthStore: Sendable {
     }
 
     func needsRefresh(_ accessToken: String?) -> Bool {
-        guard let accessToken,
-              let expiration = ProviderParsing.jwtExpiration(accessToken)
-        else {
-            return true
+        guard let accessToken else { return true }
+        guard let expiration = ProviderParsing.jwtExpiration(accessToken) else {
+            // The server can validate tokens without a locally readable expiry.
+            return false
         }
-        return expiration.timeIntervalSince(dateProvider.now()) <= 300
+        return expiration <= dateProvider.now()
     }
 
     func saveAccessToken(

@@ -27,7 +27,10 @@ struct CursorUsageClient: Sendable {
         return try await http.send(HTTPRequest(
             method: .post,
             url: Self.refreshURL,
-            headers: ["Content-Type": "application/json"],
+            headers: [
+                "Content-Type": "application/json",
+                "X-Cursor-Client-Type": "ide"
+            ],
             body: body
         ))
     }
@@ -50,7 +53,8 @@ struct CursorUsageClient: Sendable {
             headers: [
                 "Authorization": "Bearer \(accessToken)",
                 "Content-Type": "application/json",
-                "Connect-Protocol-Version": "1"
+                "Connect-Protocol-Version": "1",
+                "X-Cursor-Client-Type": "ide"
             ],
             body: Data("{}".utf8)
         ))

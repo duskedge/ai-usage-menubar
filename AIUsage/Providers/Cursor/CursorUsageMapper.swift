@@ -18,20 +18,30 @@ enum CursorUsageMapper {
         let body = try ProviderParsing.object(
             from: usageResponse.body
         )
-        guard body["enabled"] as? Bool != false,
-              let planUsage = ProviderParsing.object(body["planUsage"])
-        else {
+        if body["enabled"] as? Bool == false {
             throw ProviderFailure(
-                .authentication,
-                "No active Cursor subscription."
+                .invalidResponse,
+                "Cursor usage is unavailable for this account."
+            )
+        }
+        guard let planUsage = ProviderParsing.object(body["planUsage"]) else {
+            throw ProviderFailure(
+                .invalidResponse,
+                "Cursor quota response changed."
             )
         }
 
-        let reset = ProviderParsing.date(body["billingCycleEnd"])
+        let plan = planInfo(planResponse)
+        let period = plan?["includedUsagePeriod"]
+        let isWeekly = ProviderParsing.double(period) == 2
+            || ProviderParsing.string(period) == "INCLUDED_USAGE_PERIOD_WEEKLY"
+        let reset = isWeekly
+            ? ProviderParsing.date(plan?["includedUsageResetsAt"])
+            : ProviderParsing.date(body["billingCycleEnd"])
         var windows: [QuotaWindow] = []
         if let percent = totalPercent(planUsage) {
             windows.append(QuotaWindow(
-                kind: .totalUsage,
+                kind: isWeekly ? .weekly : .totalUsage,
                 usedPercent: clamp(percent),
                 resetsAt: reset
             ))
@@ -63,7 +73,7 @@ enum CursorUsageMapper {
 
         return ProviderSnapshot(
             provider: .cursor,
-            planName: planName(planResponse),
+            planName: ProviderParsing.string(plan?["planName"]),
             windows: windows,
             fetchedAt: now
         )
@@ -88,7 +98,7 @@ enum CursorUsageMapper {
         return spent / limit * 100
     }
 
-    private static func planName(_ response: HTTPResponse?) -> String? {
+    private static func planInfo(_ response: HTTPResponse?) -> [String: Any]? {
         guard let response,
               (200..<300).contains(response.statusCode),
               let body = try? ProviderParsing.object(
@@ -98,7 +108,7 @@ enum CursorUsageMapper {
         else {
             return nil
         }
-        return ProviderParsing.string(info["planName"])
+        return info
     }
 
     private static func clamp(_ value: Double) -> Double {
