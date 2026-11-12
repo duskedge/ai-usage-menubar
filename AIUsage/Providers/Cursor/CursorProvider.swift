@@ -17,23 +17,33 @@ actor CursorProvider: UsageProvider {
     private let authStore: CursorAuthStore
     private let client: CursorUsageClient
     private let dateProvider: DateProviding
+    private var safeStorage: CursorSafeStorage
 
     init(
         authStore: CursorAuthStore = CursorAuthStore(),
         client: CursorUsageClient = CursorUsageClient(),
-        dateProvider: DateProviding = SystemDateProvider()
+        dateProvider: DateProviding = SystemDateProvider(),
+        safeStorage: CursorSafeStorage = CursorSafeStorage()
     ) {
         self.authStore = authStore
         self.client = client
         self.dateProvider = dateProvider
+        self.safeStorage = safeStorage
     }
 
     func fetch() async throws -> ProviderSnapshot {
+        try await fetch(allowKeychainPrompt: false)
+    }
+
+    func fetch(allowKeychainPrompt: Bool) async throws -> ProviderSnapshot {
         guard var auth = authStore.load() else {
             throw ProviderFailure(
                 .authentication,
                 "Not logged in. Sign in through Cursor."
             )
+        }
+        if let stored = auth.accessToken, CursorSafeStorage.isProtected(stored) {
+            auth.accessToken = try safeStorage.accessToken(stored, allowKeychainPrompt: allowKeychainPrompt)
         }
         if authStore.needsRefresh(auth.accessToken) {
             try await refresh(&auth)
@@ -84,6 +94,12 @@ actor CursorProvider: UsageProvider {
     }
 
     private func refresh(_ auth: inout CursorAuthState) async throws {
+        if auth.source == .protectedSQLite {
+            throw ProviderFailure(
+                .authentication,
+                "Open Cursor to renew its desktop session, then refresh AI Usage."
+            )
+        }
         guard let refreshToken = auth.refreshToken else {
             throw ProviderFailure(
                 .authentication,

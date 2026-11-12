@@ -607,6 +607,13 @@ enum RefreshIntervalOption: String, CaseIterable, Identifiable, Sendable {
 protocol UsageProvider: Sendable {
     var id: ProviderID { get }
     func fetch() async throws -> ProviderSnapshot
+    func fetch(allowKeychainPrompt: Bool) async throws -> ProviderSnapshot
+}
+
+extension UsageProvider {
+    func fetch(allowKeychainPrompt: Bool) async throws -> ProviderSnapshot {
+        try await fetch()
+    }
 }
 
 protocol DateProviding: Sendable {

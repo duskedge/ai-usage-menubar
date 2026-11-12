@@ -3,6 +3,7 @@ import Foundation
 struct CursorAuthState: Equatable, Sendable {
     enum Source: Equatable, Sendable {
         case sqlite
+        case protectedSQLite
         case keychain
     }
 
@@ -37,6 +38,9 @@ struct CursorAuthStore: Sendable {
     func load() -> CursorAuthState? {
         let sqliteAccess = stateValue(Self.accessTokenKey)
         let sqliteRefresh = stateValue(Self.refreshTokenKey)
+        if CursorSafeStorage.isProtected(sqliteAccess) || CursorSafeStorage.isProtected(sqliteRefresh) {
+            return CursorAuthState(accessToken: sqliteAccess, refreshToken: nil, source: .protectedSQLite)
+        }
         let membership = stateValue(Self.membershipTypeKey)?.lowercased()
         let keychainAccess = keychainValue(Self.accessTokenService)
         let keychainRefresh = keychainValue(Self.refreshTokenService)
@@ -86,6 +90,8 @@ struct CursorAuthStore: Sendable {
         source: CursorAuthState.Source
     ) throws {
         switch source {
+        case .protectedSQLite:
+            throw ProviderFailure(.storage, "Cursor manages its protected desktop session.")
         case .sqlite:
             let sql =
                 "INSERT OR REPLACE INTO ItemTable (key, value) VALUES " +

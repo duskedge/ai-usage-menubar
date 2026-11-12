@@ -38,8 +38,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-The monochrome Claude and Codex provider icon vector paths are adapted from
-CodexBar:
+The monochrome Claude and Codex provider icon vector paths and Cursor
+Safe Storage compatibility are adapted from CodexBar:
 
   https://github.com/steipete/CodexBar
 
