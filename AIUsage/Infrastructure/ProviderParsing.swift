@@ -107,17 +107,22 @@ enum ProviderParsing {
     }
 
     static func retryDate(from response: HTTPResponse, now: Date) -> Date {
+        now.addingTimeInterval(retryAfterInterval(from: response, now: now) ?? 300)
+    }
+
+    /// Seconds from `now` named by a `Retry-After` header, or nil when absent or unreadable.
+    static func retryAfterInterval(from response: HTTPResponse, now: Date) -> TimeInterval? {
         guard let value = response.header("Retry-After")?.trimmingCharacters(in: .whitespacesAndNewlines) else {
-            return now.addingTimeInterval(300)
+            return nil
         }
         if let seconds = TimeInterval(value) {
-            return now.addingTimeInterval(max(seconds, 0))
+            return max(seconds, 0)
         }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss z"
-        return formatter.date(from: value) ?? now.addingTimeInterval(300)
+        return formatter.date(from: value).map { max($0.timeIntervalSince(now), 0) }
     }
 
     static func jwtExpiration(_ token: String) -> Date? {

@@ -54,11 +54,17 @@ Refresh request:
 - scope string:
   `user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload`
 
-The access token is refreshed within five minutes of `expiresAt` (epoch
-milliseconds). A usage `401` or `403` causes at most one refresh and one retry.
-`invalid_grant` means the session expired. A `429` honors `Retry-After`
-(seconds or HTTP date) and otherwise starts a five-minute cooldown, including
-manual refreshes.
+The app does not refresh the access token ahead of `expiresAt`; Claude Code
+rotates it. A usage `401` or `403` causes at most one refresh and one retry.
+`invalid_grant` means the session expired.
+
+The usage endpoint is shared with Claude Code and Claude.app on the same
+account, so it is read at most once every 15 minutes; refreshes in between
+reuse the last snapshot. A `429` from the usage or token endpoint starts a
+cooldown of 5, 10, 20, 40, then 60 minutes for consecutive hits, or the
+`Retry-After` value (seconds or HTTP date) when longer, plus up to 10% jitter.
+The cooldown applies to manual refreshes, survives token rotation and app
+relaunches (`UserDefaults`), and clears after the next successful read.
 
 The display plan is title-cased `subscriptionType`, plus an `Nx` fragment
 extracted from `rateLimitTier`.
